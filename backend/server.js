@@ -1,5 +1,7 @@
 require('dotenv').config();
 
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
@@ -37,6 +39,25 @@ app.use(
 );
 
 app.use(express.json({ limit: '100kb' }));
+
+/*
+ * Serve the built React SPA (frontend/dist) from the same origin as the API.
+ * Registered BEFORE the session and security-header middleware so static
+ * assets are not subject to the API's `default-src 'none'` CSP and do not
+ * trigger session lookups.
+ */
+const FRONTEND_DIST = path.join(__dirname, '..', 'frontend', 'dist');
+
+function configureFrontend() {
+  if (!fs.existsSync(FRONTEND_DIST)) return;
+
+  app.use(express.static(FRONTEND_DIST));
+
+  // SPA fallback for React Router (everything except /api/*)
+  app.get(/^\/(?!api(?:\/|$)).*/, (req, res) => {
+    res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
+  });
+}
 
 /*
  * Configure the session after the Security Center configuration
@@ -151,6 +172,11 @@ async function start() {
      * 1. Load the persisted Security Center configuration.
      */
     await loadSecurityConfig();
+
+     /*
+     * 1b. Serve the frontend (must precede session + header middleware).
+     */
+    configureFrontend();
 
     /*
      * 2. Configure sessions.
