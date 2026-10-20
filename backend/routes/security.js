@@ -54,6 +54,14 @@ router.put('/config', async (req, res, next) => {
     return res.status(400).json({ error: 'value must be true or false' });
   }
 
+  // Public-deployment guard: turning a protection OFF (Vulnerable Lab Mode)
+  // is only allowed when ALLOW_VULNERABLE_MODE=true is set on the server.
+  if (value === false && process.env.ALLOW_VULNERABLE_MODE !== 'true') {
+    return res
+      .status(403)
+      .json({ error: 'Vulnerable Lab Mode is disabled on this deployment' });
+  }
+
   try {
     const config = await setSecurityControl(key, value);
 
